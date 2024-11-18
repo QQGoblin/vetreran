@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 )
 
@@ -39,10 +40,19 @@ func LoadConfig(filepath string) (*VeteranConfig, error) {
 	}
 
 	if c.Peers == nil {
-		c.Peers = make(map[string]string)
+		return nil, fmt.Errorf("peers is empty")
 	}
 
-	c.Peers[c.ID] = c.Bind
+	if c.ID == "" {
+		c.ID, _ = os.Hostname()
+	}
+
+	address, isOK := c.Peers[c.ID]
+	if !isOK {
+		return nil, fmt.Errorf("current nodeid<%s> is not found", c.ID)
+	}
+
+	c.Bind = address
 
 	return c, nil
 }

@@ -41,7 +41,6 @@ func (v *Veteran) Start() error {
 
 	// 初始化 Raft
 	if err := v.core.InitRaft(); err != nil {
-		log.WithError(err).Error("Init raft failure")
 		return err
 	}
 
