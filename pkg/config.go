@@ -9,6 +9,7 @@ import (
 type VeteranConfig struct {
 	ID       string            `json:"id"`
 	Bind     string            `json:"bind"`
+	Listen   string            `json:"listen"`
 	Peers    map[string]string `json:"peers"`
 	Floating *Floating         `json:"floating"`
 }

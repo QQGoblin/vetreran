@@ -1,8 +1,11 @@
 package pkg
 
 import (
+	"context"
 	"github.com/QQGoblin/veteran/pkg/core"
 	log "github.com/sirupsen/logrus"
+	"net/http"
+	"os"
 	"time"
 )
 
@@ -10,6 +13,7 @@ type Veteran struct {
 	config      *VeteranConfig
 	floatingMGR *FloatingMGR
 	core        *core.Manager
+	srv         *http.Server
 	stop        chan bool
 	finished    chan bool
 }
@@ -39,6 +43,9 @@ func NewVeteran(config *VeteranConfig) (*Veteran, error) {
 
 func (v *Veteran) Start() error {
 
+	// 初始化 API Server
+	v.srv = v.apiServer()
+
 	// 初始化 Raft
 	if err := v.core.InitRaft(); err != nil {
 		return err
@@ -46,6 +53,14 @@ func (v *Veteran) Start() error {
 
 	v.stop = make(chan bool, 1)
 	v.finished = make(chan bool, 1)
+
+	go func() {
+		if err := v.srv.ListenAndServe(); err != nil {
+			log.WithError(err).Error("Start api server failure")
+			os.Exit(-1)
+
+		}
+	}()
 
 	go v.loop()
 
@@ -55,9 +70,15 @@ func (v *Veteran) Start() error {
 }
 
 func (v *Veteran) Stop() {
+
 	close(v.stop)
 
 	<-v.finished
+
+	if v.srv != nil {
+		ctxWithTimeout, _ := context.WithTimeout(context.Background(), 3*time.Second)
+		v.srv.Shutdown(ctxWithTimeout)
+	}
 
 	log.Info("Stopped")
 }

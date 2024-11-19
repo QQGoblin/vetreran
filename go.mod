@@ -3,6 +3,7 @@ module github.com/QQGoblin/veteran
 go 1.22.6
 
 require (
+	github.com/gorilla/mux v1.8.1
 	github.com/hashicorp/raft v1.7.1
 	github.com/j-keck/arping v1.0.3
 	github.com/pkg/errors v0.9.1
