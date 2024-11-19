@@ -42,7 +42,7 @@ func (manager *FloatingMGR) addIP() {
 	if err := manager.handler.AddIP(); err != nil {
 		log.WithError(err).Error("Could not set ip")
 	} else {
-		log.WithField("Address", manager.config.Address).Info("Added IP")
+		log.WithField("address", manager.config.Address).Info("Added IP")
 	}
 }
 
@@ -50,7 +50,7 @@ func (manager *FloatingMGR) deleteIP() {
 	if err := manager.handler.DeleteIP(); err != nil {
 		log.WithError(err).Error("Could not delete ip")
 	} else {
-		log.WithField("Address", manager.config.Address).Info("Deleted IP")
+		log.WithField("address", manager.config.Address).Info("Deleted IP")
 	}
 }
 

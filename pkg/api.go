@@ -63,11 +63,11 @@ func (v *Veteran) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := v.core.AddMember(id, address[0]); err != nil {
-		log.WithError(err).WithFields(log.Fields{"ID": id, "Address": address[0]}).Error("Add member failure")
+		log.WithError(err).WithFields(log.Fields{"id": id, "address": address[0]}).Error("Add member failure")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.WithFields(log.Fields{"ID": id, "Address": address[0]}).Info("Add member success")
+	log.WithFields(log.Fields{"id": id, "address": address[0]}).Info("Add member success")
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -76,10 +76,10 @@ func (v *Veteran) DelMemberHandler(w http.ResponseWriter, r *http.Request) {
 	id := vars["memberID"]
 
 	if err := v.core.DelMember(id); err != nil {
-		log.WithError(err).WithField("ID", id).Error("Del member failure")
+		log.WithError(err).WithField("id", id).Error("Del member failure")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.WithField("ID", id).Info("Del member success")
+	log.WithField("id", id).Info("Del member success")
 	w.WriteHeader(http.StatusOK)
 }

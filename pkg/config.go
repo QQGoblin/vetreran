@@ -2,16 +2,15 @@ package pkg
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 )
 
 type VeteranConfig struct {
-	ID       string            `json:"id"`
-	Bind     string            `json:"bind"`
-	Listen   string            `json:"listen"`
-	Peers    map[string]string `json:"peers"`
-	Floating *Floating         `json:"floating"`
+	ID        string            `json:"id"`
+	Listen    string            `json:"listen"`
+	Store     string            `json:"store"`
+	InitPeers map[string]string `json:"peers"`
+	Floating  *Floating         `json:"floating"`
 }
 
 type VirtualType string
@@ -40,20 +39,9 @@ func LoadConfig(filepath string) (*VeteranConfig, error) {
 		return nil, err
 	}
 
-	if c.Peers == nil {
-		return nil, fmt.Errorf("peers is empty")
-	}
-
 	if c.ID == "" {
 		c.ID, _ = os.Hostname()
 	}
-
-	address, isOK := c.Peers[c.ID]
-	if !isOK {
-		return nil, fmt.Errorf("current nodeid<%s> is not found", c.ID)
-	}
-
-	c.Bind = address
 
 	return c, nil
 }

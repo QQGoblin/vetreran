@@ -2,29 +2,25 @@ package pkg
 
 import (
 	"context"
-	"github.com/QQGoblin/veteran/pkg/core"
+	"github.com/QQGoblin/veteran/pkg/consensus"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"net/http"
-	"os"
 	"time"
 )
 
 type Veteran struct {
 	config      *VeteranConfig
 	floatingMGR *FloatingMGR
-	core        *core.Manager
+	core        *consensus.Manager
 	srv         *http.Server
 	stop        chan bool
 	finished    chan bool
 }
 
-const (
-	DataPath = "/opt/veteran"
-)
-
 func NewVeteran(config *VeteranConfig) (*Veteran, error) {
 
-	core, err := core.NewManager(config.ID, config.Bind, config.Peers)
+	core, err := consensus.NewManager(config.ID, config.InitPeers, config.Store)
 	if err != nil {
 		return nil, err
 	}
@@ -54,15 +50,13 @@ func (v *Veteran) Start() error {
 	v.stop = make(chan bool, 1)
 	v.finished = make(chan bool, 1)
 
-	go func() {
-		if err := v.srv.ListenAndServe(); err != nil {
-			log.WithError(err).Error("Start api server failure")
-			os.Exit(-1)
+	go v.loop()
 
+	go func() {
+		if err := v.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.WithError(err).Fatal("Start api server failure")
 		}
 	}()
-
-	go v.loop()
 
 	log.Info("Started")
 
@@ -76,8 +70,9 @@ func (v *Veteran) Stop() {
 	<-v.finished
 
 	if v.srv != nil {
-		ctxWithTimeout, _ := context.WithTimeout(context.Background(), 3*time.Second)
-		v.srv.Shutdown(ctxWithTimeout)
+		ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		_ = v.srv.Shutdown(ctxWithTimeout)
+		defer cancel()
 	}
 
 	log.Info("Stopped")

@@ -1,4 +1,4 @@
-package core
+package consensus
 
 import (
 	"io"
@@ -18,5 +18,15 @@ func (fsm FSM) Restore(snap io.ReadCloser) error {
 }
 
 func (fsm FSM) Snapshot() (raft.FSMSnapshot, error) {
-	return Snapshot{}, nil
+	return FSMSnapshot{}, nil
+}
+
+type FSMSnapshot struct {
+}
+
+func (snapshot FSMSnapshot) Persist(sink raft.SnapshotSink) error {
+	return nil
+}
+
+func (snapshot FSMSnapshot) Release() {
 }
