@@ -9,7 +9,7 @@ type VeteranConfig struct {
 	ID        string            `json:"id"`
 	Listen    string            `json:"listen"`
 	Store     string            `json:"store"`
-	InitPeers map[string]string `json:"peers"`
+	InitPeers map[string]string `json:"initial_cluster"`
 	Floating  *Floating         `json:"floating"`
 	RaftLog   RaftLogConfig     `json:"raft_log"`
 }

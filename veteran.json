@@ -6,7 +6,7 @@
     "enable": true,
     "level": "info"
   },
-  "peers": {
+  "initial_cluster": {
     "274174d4-de2c-53b2-a366-27088884c56c": "172.28.117.42:27010"
   },
   "floating": {
