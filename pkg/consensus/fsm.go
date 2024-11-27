@@ -6,27 +6,18 @@ import (
 	"github.com/hashicorp/raft"
 )
 
-type FSM struct {
-}
+type FSM struct{}
 
-func (fsm FSM) Apply(log *raft.Log) interface{} {
-	return nil
-}
+type FSMSnapshot struct{}
 
-func (fsm FSM) Restore(snap io.ReadCloser) error {
-	return nil
-}
+func (fsm FSM) Apply(*raft.Log) interface{} { return nil }
 
-func (fsm FSM) Snapshot() (raft.FSMSnapshot, error) {
-	return FSMSnapshot{}, nil
-}
+func (fsm FSM) Restore(io.ReadCloser) error { return nil }
 
-type FSMSnapshot struct {
-}
+func (fsm FSM) Snapshot() (raft.FSMSnapshot, error) { return FSMSnapshot{}, nil }
 
-func (snapshot FSMSnapshot) Persist(sink raft.SnapshotSink) error {
-	return nil
-}
+func (fsm FSM) StoreConfiguration(uint64, raft.Configuration) {}
 
-func (snapshot FSMSnapshot) Release() {
-}
+func (snapshot FSMSnapshot) Persist(raft.SnapshotSink) error { return nil }
+
+func (snapshot FSMSnapshot) Release() {}

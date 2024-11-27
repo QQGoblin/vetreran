@@ -3,8 +3,10 @@ package pkg
 import (
 	"context"
 	"github.com/QQGoblin/veteran/pkg/consensus"
+	logutils "github.com/QQGoblin/veteran/pkg/log"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"io"
 	"net/http"
 	"time"
 )
@@ -43,7 +45,12 @@ func (v *Veteran) Start() error {
 	v.srv = v.apiServer()
 
 	// 初始化 Raft
-	if err := v.core.InitRaft(); err != nil {
+	logOutput := io.Discard
+	if v.config.RaftLog.Enable {
+		logOutput = logutils.RotateLogOutput(v.config.RaftLog.Output)
+	}
+
+	if err := v.core.InitRaft(logOutput, v.config.RaftLog.Level); err != nil {
 		return err
 	}
 

@@ -20,7 +20,7 @@ func (v *Veteran) apiServer() *http.Server {
 
 }
 
-func (v *Veteran) StatusHandler(w http.ResponseWriter, r *http.Request) {
+func (v *Veteran) StatusHandler(w http.ResponseWriter, _ *http.Request) {
 
 	state, err := v.core.Status()
 	if err != nil {

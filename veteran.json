@@ -2,6 +2,10 @@
   "id": "",
   "listen": "0.0.0.0:27000",
   "store": "/opt/veteran",
+  "raft_log": {
+    "enable": true,
+    "level": "info"
+  },
   "peers": {
     "274174d4-de2c-53b2-a366-27088884c56c": "172.28.117.42:27010"
   },

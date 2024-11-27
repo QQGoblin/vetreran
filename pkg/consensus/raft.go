@@ -14,12 +14,13 @@ import (
 
 const (
 	memberOperTimeout = time.Second * 3
+	applyOperTimeout  = time.Second * 3
 	db                = "veteran.db"
+	snapshotRetain    = 3
 )
 
 type Manager struct {
 	id        string
-	logger    io.Writer
 	initPeers map[string]string
 	storePath string
 	fsm       FSM
@@ -38,7 +39,6 @@ func NewManager(id string, initPeers map[string]string, storePath string) (*Mana
 
 	return &Manager{
 		id:        id,
-		logger:    io.Discard,
 		storePath: storePath,
 		initPeers: initPeers,
 		fsm:       FSM{},
@@ -46,11 +46,14 @@ func NewManager(id string, initPeers map[string]string, storePath string) (*Mana
 
 }
 
-func (m *Manager) InitRaft() error {
-	// Create configuration
+func (m *Manager) InitRaft(logger io.Writer, loglevel string) error {
+
+	// 初始化配置
 	config := raft.DefaultConfig()
 	config.LocalID = raft.ServerID(m.id)
-	config.LogOutput = m.logger
+	config.NoSnapshotRestoreOnStart = true // 只从快照文件初始集群配置信息
+	config.LogOutput = logger
+	config.LogLevel = loglevel
 
 	// 初始化 snapshots 以及 DB
 	if err := os.MkdirAll(m.storePath, 0755); err != nil {
@@ -64,7 +67,11 @@ func (m *Manager) InitRaft() error {
 		return fmt.Errorf("new bbolt store: %s", err)
 	}
 
-	snapshots := raft.NewInmemSnapshotStore()
+	snapshots, err := raft.NewFileSnapshotStore(m.storePath, snapshotRetain, logger)
+	if err != nil {
+		return fmt.Errorf("new snapshot store: %s", err)
+	}
+
 	existing, err := raft.HasExistingState(boltDB, boltDB, snapshots)
 	if err != nil {
 		return err
@@ -72,35 +79,11 @@ func (m *Manager) InitRaft() error {
 
 	// 初始化 raft 集群
 	if !existing {
-		return m.newCluster(config, boltDB)
+		return m.newCluster(config, boltDB, snapshots)
 	}
 
 	// 启动 raft 集群
-	temp := raft.DefaultConfig()
-	temp.LocalID = raft.ServerID(m.id)
-	temp.LogOutput = m.logger
-	configuration, err := raft.GetConfiguration(temp, m.fsm, boltDB, boltDB, raft.NewInmemSnapshotStore(), &raft.InmemTransport{})
-	if err != nil {
-		return err
-	}
-
-	var bind string
-	for _, server := range configuration.Servers {
-		if server.ID == raft.ServerID(m.id) {
-			bind = string(server.Address)
-		}
-	}
-
-	if bind == "" {
-		return fmt.Errorf("this node is not found in raft.db")
-	}
-
-	address, err := net.ResolveTCPAddr("tcp", bind)
-	if err != nil {
-		return err
-	}
-
-	transport, err := raft.NewTCPTransport(bind, address, 3, 10*time.Second, m.logger)
+	transport, err := m.localTransport(boltDB, boltDB, snapshots, logger)
 	if err != nil {
 		return err
 	}
@@ -109,7 +92,7 @@ func (m *Manager) InitRaft() error {
 	return err
 }
 
-func (m *Manager) newCluster(config *raft.Config, store *raftboltdb.BoltStore) error {
+func (m *Manager) newCluster(config *raft.Config, store *raftboltdb.BoltStore, snapshots raft.SnapshotStore) error {
 
 	// 初始化通信接口
 	var bind string
@@ -128,12 +111,10 @@ func (m *Manager) newCluster(config *raft.Config, store *raftboltdb.BoltStore) e
 		return err
 	}
 
-	transport, err := raft.NewTCPTransport(bind, address, 3, 10*time.Second, m.logger)
+	transport, err := raft.NewTCPTransport(bind, address, 3, 10*time.Second, config.LogOutput)
 	if err != nil {
 		return err
 	}
-
-	snapshots := raft.NewInmemSnapshotStore()
 
 	configuration := raft.Configuration{}
 	for id, ip := range m.initPeers {
@@ -147,4 +128,42 @@ func (m *Manager) newCluster(config *raft.Config, store *raftboltdb.BoltStore) e
 	m.Raft, err = raft.NewRaft(config, m.fsm, store, store, snapshots, transport)
 
 	return err
+}
+
+func (m *Manager) localTransport(logStore raft.LogStore, stableStore raft.StableStore, snapshot raft.SnapshotStore, logger io.Writer) (raft.Transport, error) {
+
+	temp := raft.DefaultConfig()
+	temp.LocalID = raft.ServerID(m.id)
+	temp.LogOutput = logger
+	configuration, err := raft.GetConfiguration(temp, m.fsm, logStore, stableStore, snapshot, &raft.InmemTransport{})
+	if err != nil {
+		return nil, err
+	}
+
+	var bind string
+	for _, server := range configuration.Servers {
+		if server.ID == raft.ServerID(m.id) {
+			bind = string(server.Address)
+		}
+	}
+
+	if bind == "" {
+		return nil, fmt.Errorf("this node is not found in raft.db")
+	}
+
+	if bind == "" {
+		return nil, fmt.Errorf("this node is not found in raft.db")
+	}
+
+	address, err := net.ResolveTCPAddr("tcp", bind)
+	if err != nil {
+		return nil, err
+	}
+
+	transport, err := raft.NewTCPTransport(bind, address, 3, 10*time.Second, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return transport, nil
 }
