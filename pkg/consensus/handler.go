@@ -28,7 +28,7 @@ func (m *Manager) Status() (*ClusterState, error) {
 
 }
 
-func (m *Manager) AddMember(memberID, address string) error {
+func (m *Manager) AddMember(memberID, address string, nonVoter bool) error {
 
 	if err := m.leaderCheck(); err != nil {
 		return err
@@ -51,6 +51,10 @@ func (m *Manager) AddMember(memberID, address string) error {
 	// TODO: 单节点添加第二个 Member 时， 需要先启动被添加节点否者会导致服务不可用
 	m.lock.Lock()
 	defer m.lock.Unlock()
+
+	if nonVoter {
+		return m.Raft.AddNonvoter(raft.ServerID(memberID), raft.ServerAddress(address), 0, memberOperTimeout).Error()
+	}
 
 	return m.Raft.AddVoter(raft.ServerID(memberID), raft.ServerAddress(address), 0, memberOperTimeout).Error()
 }

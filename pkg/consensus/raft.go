@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb/v2"
+	log "github.com/sirupsen/logrus"
 	"io"
 	"net"
 	"os"
@@ -90,6 +91,13 @@ func (m *Manager) InitRaft(logger io.Writer, loglevel string) error {
 
 	m.Raft, err = raft.NewRaft(config, m.fsm, boltDB, boltDB, snapshots, transport)
 	return err
+}
+
+func (m *Manager) Shutdown() {
+	shutdownFuture := m.Raft.Shutdown()
+	if err := shutdownFuture.Error(); err != nil {
+		log.WithError(err).Error("Stop raft failed")
+	}
 }
 
 func (m *Manager) newCluster(config *raft.Config, store *raftboltdb.BoltStore, snapshots raft.SnapshotStore) error {

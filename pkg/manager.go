@@ -2,8 +2,12 @@ package pkg
 
 import (
 	"context"
+	"fmt"
+	"github.com/QQGoblin/veteran/pkg/config"
 	"github.com/QQGoblin/veteran/pkg/consensus"
 	logutils "github.com/QQGoblin/veteran/pkg/log"
+	"github.com/QQGoblin/veteran/pkg/plugins"
+	"github.com/hashicorp/raft"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"io"
@@ -12,30 +16,23 @@ import (
 )
 
 type Veteran struct {
-	config      *VeteranConfig
-	floatingMGR *FloatingMGR
-	core        *consensus.Manager
-	srv         *http.Server
-	stop        chan bool
-	finished    chan bool
+	config        *config.VeteranConfig
+	core          *consensus.Manager
+	srv           *http.Server
+	pluginsCancel map[string]context.CancelFunc
 }
 
-func NewVeteran(config *VeteranConfig) (*Veteran, error) {
+func NewVeteran(c *config.VeteranConfig) (*Veteran, error) {
 
-	core, err := consensus.NewManager(config.ID, config.InitPeers, config.Store)
-	if err != nil {
-		return nil, err
-	}
-
-	floatingMGR, err := NewFloatingMGR(config.Floating)
+	core, err := consensus.NewManager(c.ID, c.InitPeers, c.Store)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Veteran{
-		config:      config,
-		floatingMGR: floatingMGR,
-		core:        core,
+		config:        c,
+		core:          core,
+		pluginsCancel: make(map[string]context.CancelFunc),
 	}, nil
 }
 
@@ -54,10 +51,9 @@ func (v *Veteran) Start() error {
 		return err
 	}
 
-	v.stop = make(chan bool, 1)
-	v.finished = make(chan bool, 1)
-
-	go v.loop()
+	if err := v.initObserver(); err != nil {
+		return err
+	}
 
 	go func() {
 		if err := v.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -72,58 +68,37 @@ func (v *Veteran) Start() error {
 
 func (v *Veteran) Stop() {
 
-	close(v.stop)
-
-	<-v.finished
-
 	if v.srv != nil {
 		ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		_ = v.srv.Shutdown(ctxWithTimeout)
 		defer cancel()
 	}
 
+	for _, pluginCancel := range v.pluginsCancel {
+		pluginCancel()
+	}
+
+	v.core.Shutdown()
+
 	log.Info("Stopped")
 }
 
-func (v *Veteran) loop() {
+func (v *Veteran) initObserver() error {
 
-	ticker := time.NewTicker(time.Second)
-	isLeader := false
-
-	v.floatingMGR.deleteIP()
-
-	for {
-		select {
-		case leader := <-v.core.Raft.LeaderCh():
-			if leader {
-				isLeader = true
-				log.Info("Leading")
-				v.floatingMGR.addIP()
-			} else {
-				isLeader = false
-				log.Info("Following")
-				v.floatingMGR.deleteIP()
-			}
-
-		case <-ticker.C:
-			if isLeader {
-				result, err := v.floatingMGR.isSet()
-				if err != nil {
-					log.WithError(err).WithField("ip", v.config.Floating.Address).Error("Could not check ip")
-				}
-				if result == false {
-					log.Error("Lost IP")
-					v.floatingMGR.addIP()
-				}
-			}
-
-		case <-v.stop:
-			log.Info("Stopping")
-			if isLeader {
-				v.floatingMGR.deleteIP()
-			}
-			close(v.finished)
-			return
-		}
+	if v.core.Raft == nil {
+		return fmt.Errorf("raft is not initial")
 	}
+
+	for name, plugin := range plugins.Plugins {
+		observationChan := make(chan raft.Observation)
+		ctx, cancel := context.WithCancel(context.Background())
+		v.pluginsCancel[name] = cancel
+		if err := plugin.Setup(v.config); err != nil {
+			log.WithError(err).WithField("name", name).Fatal("Setup plugin failure")
+		}
+		v.core.Raft.RegisterObserver(raft.NewObserver(observationChan, false, plugin.Filter))
+		plugins.StartPlugin(ctx, observationChan, plugin)
+	}
+
+	return nil
 }

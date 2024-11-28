@@ -7,6 +7,7 @@ import (
 	"github.com/gorilla/mux"
 	log "github.com/sirupsen/logrus"
 	"net/http"
+	"strings"
 )
 
 func (v *Veteran) apiServer() *http.Server {
@@ -44,7 +45,7 @@ func (v *Veteran) StatusHandler(w http.ResponseWriter, _ *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "%v\n", prettyJSON.String())
+	_, _ = fmt.Fprintf(w, "%v\n", prettyJSON.String())
 
 }
 
@@ -55,6 +56,7 @@ func (v *Veteran) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 
 	id := vars["memberID"]
 	address := params["address"]
+	nonVote := params["non_voter"]
 
 	if len(address) == 0 {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -62,12 +64,17 @@ func (v *Veteran) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := v.core.AddMember(id, address[0]); err != nil {
-		log.WithError(err).WithFields(log.Fields{"id": id, "address": address[0]}).Error("Add member failure")
+	addNonVoter := false
+	if len(nonVote) != 0 && strings.ToLower(nonVote[0]) == "true" {
+		addNonVoter = true
+	}
+
+	if err := v.core.AddMember(id, address[0], addNonVoter); err != nil {
+		log.WithError(err).WithFields(log.Fields{"id": id, "address": address[0], "non-voter": addNonVoter}).Error("Add member failure")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	log.WithFields(log.Fields{"id": id, "address": address[0]}).Info("Add member success")
+	log.WithFields(log.Fields{"id": id, "address": address[0], "non-voter": addNonVoter}).Info("Add member success")
 	w.WriteHeader(http.StatusOK)
 }
 

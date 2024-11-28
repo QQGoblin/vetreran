@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"github.com/QQGoblin/veteran/pkg"
+	"github.com/QQGoblin/veteran/pkg/config"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
@@ -10,14 +11,14 @@ import (
 
 func main() {
 
-	config := flag.String("config", "veteran.json", "config file path")
+	path := flag.String("config", "veteran.json", "config file path")
 	flag.Parse()
 
 	log.SetFormatter(&log.JSONFormatter{
 		TimestampFormat: "2006-01-02 15:04:05",
 	})
 
-	vetreranConfig, err := pkg.LoadConfig(*config)
+	vetreranConfig, err := config.LoadConfig(*path)
 	if err != nil {
 		log.WithError(err).Error("Load config failure")
 		os.Exit(-1)

@@ -1,8 +1,12 @@
-package pkg
+package config
 
 import (
 	"encoding/json"
 	"os"
+)
+
+const (
+	defaultRaftLogName = "/var/log/veteran/raft.log"
 )
 
 type VeteranConfig struct {
@@ -10,22 +14,8 @@ type VeteranConfig struct {
 	Listen    string            `json:"listen"`
 	Store     string            `json:"store"`
 	InitPeers map[string]string `json:"initial_cluster"`
-	Floating  *Floating         `json:"floating"`
 	RaftLog   RaftLogConfig     `json:"raft_log"`
-}
-
-type VirtualType string
-
-const (
-	AliasType          VirtualType = "alias"
-	MACVlanType        VirtualType = "macvlan"
-	defaultRaftLogName             = "/var/log/veteran/raft.log"
-)
-
-type Floating struct {
-	IFace   string      `json:"iface"`
-	Type    VirtualType `json:"type"`
-	Address string      `json:"address"`
+	Raw       []byte
 }
 
 type RaftLogConfig struct {
@@ -47,6 +37,7 @@ func LoadConfig(filepath string) (*VeteranConfig, error) {
 			Enable: false,
 			Level:  "info",
 		},
+		Raw: b,
 	}
 
 	if err = json.Unmarshal(b, c); err != nil {
